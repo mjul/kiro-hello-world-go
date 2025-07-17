@@ -58,10 +58,10 @@ func (e ValidationErrors) Error() string {
 // Load loads configuration from environment variables with comprehensive validation
 func Load() (*Config, error) {
 	config := &Config{
-		Port:          getEnv("PORT", "8080"),
+		Port:          getEnv("PORT", "3000"),
 		DatabaseURL:   getEnv("DATABASE_URL", "./database/app.db"),
 		SessionSecret: getEnv("SESSION_SECRET", ""),
-		BaseURL:       getEnv("BASE_URL", "http://localhost:8080"),
+		BaseURL:       getEnv("BASE_URL", "http://localhost:3000"),
 	}
 
 	// Microsoft OAuth2 configuration
@@ -253,8 +253,8 @@ Required Environment Variables:
   GITHUB_CLIENT_SECRET    - GitHub OAuth app client secret
 
 Optional Environment Variables:
-  PORT                    - Server port (default: 8080)
-  BASE_URL               - Application base URL (default: http://localhost:8080)
+  PORT                    - Server port (default: 3000)
+  BASE_URL               - Application base URL (default: http://localhost:3000)
   DATABASE_URL           - SQLite database file path (default: ./database/app.db)
 
 Configuration Tips:
