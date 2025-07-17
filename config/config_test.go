@@ -477,3 +477,51 @@ func TestPrintConfigurationHelp(t *testing.T) {
 	
 	PrintConfigurationHelp()
 }
+
+func TestParseDatabaseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "plain file path",
+			input:    "./database/app.db",
+			expected: "./database/app.db",
+		},
+		{
+			name:     "sqlite: prefix with filename",
+			input:    "sqlite:app.db",
+			expected: "app.db",
+		},
+		{
+			name:     "sqlite:// prefix with filename",
+			input:    "sqlite://app.db",
+			expected: "app.db",
+		},
+		{
+			name:     "sqlite:/// prefix with absolute path",
+			input:    "sqlite:///var/lib/app.db",
+			expected: "/var/lib/app.db",
+		},
+		{
+			name:     "sqlite: prefix with relative path",
+			input:    "sqlite:./database/app.db",
+			expected: "./database/app.db",
+		},
+		{
+			name:     "sqlite:// prefix with relative path",
+			input:    "sqlite://./database/app.db",
+			expected: "./database/app.db",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseDatabaseURL(tt.input)
+			if result != tt.expected {
+				t.Errorf("parseDatabaseURL(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

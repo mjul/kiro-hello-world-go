@@ -59,7 +59,7 @@ func (e ValidationErrors) Error() string {
 func Load() (*Config, error) {
 	config := &Config{
 		Port:          getEnv("PORT", "3000"),
-		DatabaseURL:   getEnv("DATABASE_URL", "./database/app.db"),
+		DatabaseURL:   parseDatabaseURL(getEnv("DATABASE_URL", "./database/app.db")),
 		SessionSecret: getEnv("SESSION_SECRET", ""),
 		BaseURL:       getEnv("BASE_URL", "http://localhost:3000"),
 	}
@@ -289,4 +289,34 @@ func getEnvAsInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+// parseDatabaseURL parses a database URL and extracts the file path for SQLite
+func parseDatabaseURL(databaseURL string) string {
+	// Handle SQLite URL formats:
+	// - sqlite:filename
+	// - sqlite://filename
+	// - sqlite:///absolute/path/to/file
+	// - plain file path (no prefix)
+	
+	if strings.HasPrefix(databaseURL, "sqlite:") {
+		// Remove the sqlite: prefix
+		path := strings.TrimPrefix(databaseURL, "sqlite:")
+		
+		// Handle sqlite:// format
+		if strings.HasPrefix(path, "//") {
+			path = strings.TrimPrefix(path, "//")
+		}
+		
+		// Handle sqlite:/// format (absolute path)
+		if strings.HasPrefix(path, "/") && len(path) > 1 {
+			return path
+		}
+		
+		// Relative path or simple filename
+		return path
+	}
+	
+	// Return as-is if no sqlite: prefix (plain file path)
+	return databaseURL
 }
