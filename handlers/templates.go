@@ -25,23 +25,29 @@ func NewTemplateManager(basePath string) *TemplateManager {
 
 // LoadTemplates loads all templates from the templates directory
 func (tm *TemplateManager) LoadTemplates() error {
-	// Define template files
-	templateFiles := []string{
-		filepath.Join(tm.basePath, "base.html"),
-		filepath.Join(tm.basePath, "login.html"),
-		filepath.Join(tm.basePath, "dashboard.html"),
-		filepath.Join(tm.basePath, "error.html"),
+	// Parse each template individually with the base template to enable inheritance
+	templateConfigs := map[string][]string{
+		"login.html": {
+			filepath.Join(tm.basePath, "base.html"),
+			filepath.Join(tm.basePath, "login.html"),
+		},
+		"dashboard.html": {
+			filepath.Join(tm.basePath, "base.html"),
+			filepath.Join(tm.basePath, "dashboard.html"),
+		},
+		"error.html": {
+			filepath.Join(tm.basePath, "base.html"),
+			filepath.Join(tm.basePath, "error.html"),
+		},
 	}
 
-	// Parse all templates together to enable template inheritance
-	tmpl, err := template.ParseFiles(templateFiles...)
-	if err != nil {
-		return fmt.Errorf("failed to parse templates: %w", err)
-	}
-
-	// Store each template by name
-	for _, t := range tmpl.Templates() {
-		tm.templates[t.Name()] = t
+	// Parse each template set separately
+	for templateName, files := range templateConfigs {
+		tmpl, err := template.ParseFiles(files...)
+		if err != nil {
+			return fmt.Errorf("failed to parse template %s: %w", templateName, err)
+		}
+		tm.templates[templateName] = tmpl
 	}
 
 	return nil
@@ -49,10 +55,9 @@ func (tm *TemplateManager) LoadTemplates() error {
 
 // RenderTemplate renders a template with the given data and writes to Gin context
 func (tm *TemplateManager) RenderTemplate(c *gin.Context, templateName string, data interface{}) {
+	// Check if the specific template exists
 	tmpl, exists := tm.templates[templateName]
 	if !exists {
-		// For template not found errors, don't call HandleError to avoid infinite loops
-		// Instead, return a simple error response
 		c.Status(http.StatusInternalServerError)
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		
@@ -65,13 +70,15 @@ func (tm *TemplateManager) RenderTemplate(c *gin.Context, templateName string, d
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	
-	if err := tmpl.Execute(c.Writer, data); err != nil {
-		// For template render errors, also avoid HandleError to prevent loops
+	// Execute the base template from the specific template set
+	// This will render the base.html template with the specific template's defined blocks
+	if err := tmpl.ExecuteTemplate(c.Writer, "base.html", data); err != nil {
+		// For template render errors, return 500 status code, not 200
 		c.Status(http.StatusInternalServerError)
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		
 		html := fmt.Sprintf(`<!DOCTYPE html>
-<html><head><title>Template Error</title></head>
+<html><head><title>Template Render Error</title></head>
 <body><h1>Template Render Error</h1><p>Failed to render template %s: %v</p></body></html>`, templateName, err)
 		c.Writer.WriteString(html)
 		return
