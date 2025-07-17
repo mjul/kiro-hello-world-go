@@ -1,6 +1,3 @@
-//go:build !cgo
-// +build !cgo
-
 package database
 
 import (
@@ -9,9 +6,13 @@ import (
 	"time"
 )
 
+
+
 // TestNewUserRepository tests the constructor
 func TestNewUserRepository(t *testing.T) {
-	db := &DB{DB: nil}
+	db := setupTestDB(t)
+	defer db.Close()
+	
 	repo := NewUserRepository(db)
 	
 	if repo == nil {
@@ -24,39 +25,78 @@ func TestNewUserRepository(t *testing.T) {
 	}
 }
 
-// TestSQLiteUserRepository_FindByProviderID_NilDB tests with nil database
-func TestSQLiteUserRepository_FindByProviderID_NilDB(t *testing.T) {
-	repo := &SQLiteUserRepository{db: nil}
+// TestSQLiteUserRepository_FindByProviderID_NotFound tests finding non-existent user
+func TestSQLiteUserRepository_FindByProviderID_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
 	
-	user, err := repo.FindByProviderID("github", "12345")
-	if err == nil {
-		t.Errorf("FindByProviderID() should fail with nil database")
+	repo := NewUserRepository(db)
+	
+	user, err := repo.FindByProviderID("github", "nonexistent")
+	if err != nil {
+		t.Errorf("FindByProviderID() should not return error for non-existent user, got: %v", err)
 	}
 	if user != nil {
-		t.Errorf("FindByProviderID() should return nil user with nil database")
+		t.Errorf("FindByProviderID() should return nil user for non-existent user")
 	}
 }
 
-// TestSQLiteUserRepository_Create_NilDB tests with nil database
-func TestSQLiteUserRepository_Create_NilDB(t *testing.T) {
-	repo := &SQLiteUserRepository{db: nil}
+// TestSQLiteUserRepository_CreateAndFind tests creating and finding a user
+func TestSQLiteUserRepository_CreateAndFind(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	
+	repo := NewUserRepository(db)
 	
 	user := &models.User{
 		Provider:   "github",
 		ProviderID: "12345",
 		Username:   "testuser",
+		Email:      "test@example.com",
 	}
 	
+	// Create user
 	err := repo.Create(user)
-	if err == nil {
-		t.Errorf("Create() should fail with nil database")
+	if err != nil {
+		t.Fatalf("Create() failed: %v", err)
+	}
+	
+	// User should now have an ID
+	if user.ID == 0 {
+		t.Errorf("Create() should set user ID")
+	}
+	
+	// Find the user
+	foundUser, err := repo.FindByProviderID("github", "12345")
+	if err != nil {
+		t.Fatalf("FindByProviderID() failed: %v", err)
+	}
+	
+	if foundUser == nil {
+		t.Fatalf("FindByProviderID() returned nil user")
+	}
+	
+	// Verify user data
+	if foundUser.Provider != user.Provider {
+		t.Errorf("Provider = %v, want %v", foundUser.Provider, user.Provider)
+	}
+	if foundUser.ProviderID != user.ProviderID {
+		t.Errorf("ProviderID = %v, want %v", foundUser.ProviderID, user.ProviderID)
+	}
+	if foundUser.Username != user.Username {
+		t.Errorf("Username = %v, want %v", foundUser.Username, user.Username)
+	}
+	if foundUser.Email != user.Email {
+		t.Errorf("Email = %v, want %v", foundUser.Email, user.Email)
 	}
 }
 
 // TestSQLiteUserRepository_Create_NilUser tests with nil user
 func TestSQLiteUserRepository_Create_NilUser(t *testing.T) {
-	db := &DB{DB: nil}
-	repo := &SQLiteUserRepository{db: db}
+	db := setupTestDB(t)
+	defer db.Close()
+	
+	repo := NewUserRepository(db)
 	
 	err := repo.Create(nil)
 	if err == nil {
@@ -71,8 +111,10 @@ func TestSQLiteUserRepository_Create_NilUser(t *testing.T) {
 
 // TestSQLiteUserRepository_Create_InvalidUser tests with invalid user
 func TestSQLiteUserRepository_Create_InvalidUser(t *testing.T) {
-	db := &DB{DB: nil}
-	repo := &SQLiteUserRepository{db: db}
+	db := setupTestDB(t)
+	defer db.Close()
+	
+	repo := NewUserRepository(db)
 	
 	// User with missing required fields
 	user := &models.User{
@@ -85,34 +127,14 @@ func TestSQLiteUserRepository_Create_InvalidUser(t *testing.T) {
 	if err == nil {
 		t.Errorf("Create() should fail with invalid user")
 	}
-	
-	// Should contain validation error
-	if err != nil && err.Error() == "" {
-		t.Errorf("Create() should return validation error message")
-	}
-}
-
-// TestSQLiteUserRepository_Update_NilDB tests with nil database
-func TestSQLiteUserRepository_Update_NilDB(t *testing.T) {
-	repo := &SQLiteUserRepository{db: nil}
-	
-	user := &models.User{
-		ID:         1,
-		Provider:   "github",
-		ProviderID: "12345",
-		Username:   "testuser",
-	}
-	
-	err := repo.Update(user)
-	if err == nil {
-		t.Errorf("Update() should fail with nil database")
-	}
 }
 
 // TestSQLiteUserRepository_Update_NilUser tests with nil user
 func TestSQLiteUserRepository_Update_NilUser(t *testing.T) {
-	db := &DB{DB: nil}
-	repo := &SQLiteUserRepository{db: db}
+	db := setupTestDB(t)
+	defer db.Close()
+	
+	repo := NewUserRepository(db)
 	
 	err := repo.Update(nil)
 	if err == nil {
@@ -127,8 +149,10 @@ func TestSQLiteUserRepository_Update_NilUser(t *testing.T) {
 
 // TestSQLiteUserRepository_Update_InvalidUserID tests with invalid user ID
 func TestSQLiteUserRepository_Update_InvalidUserID(t *testing.T) {
-	db := &DB{DB: nil}
-	repo := &SQLiteUserRepository{db: db}
+	db := setupTestDB(t)
+	defer db.Close()
+	
+	repo := NewUserRepository(db)
 	
 	tests := []struct {
 		name   string
@@ -160,35 +184,14 @@ func TestSQLiteUserRepository_Update_InvalidUserID(t *testing.T) {
 	}
 }
 
-// TestSQLiteUserRepository_Update_InvalidUser tests with invalid user data
-func TestSQLiteUserRepository_Update_InvalidUser(t *testing.T) {
-	db := &DB{DB: nil}
-	repo := &SQLiteUserRepository{db: db}
+// TestSQLiteUserRepository_CreateUpdateAndFind tests full CRUD operations
+func TestSQLiteUserRepository_CreateUpdateAndFind(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
 	
-	// User with missing required fields
-	user := &models.User{
-		ID:         1,
-		Provider:   "", // Invalid - empty provider
-		ProviderID: "12345",
-		Username:   "testuser",
-	}
+	repo := NewUserRepository(db)
 	
-	err := repo.Update(user)
-	if err == nil {
-		t.Errorf("Update() should fail with invalid user")
-	}
-	
-	// Should contain validation error
-	if err != nil && err.Error() == "" {
-		t.Errorf("Update() should return validation error message")
-	}
-}
-
-// TestSQLiteUserRepository_Create_TimestampHandling tests timestamp handling
-func TestSQLiteUserRepository_Create_TimestampHandling(t *testing.T) {
-	db := &DB{DB: nil}
-	repo := &SQLiteUserRepository{db: db}
-	
+	// Create user
 	user := &models.User{
 		Provider:   "github",
 		ProviderID: "12345",
@@ -196,41 +199,47 @@ func TestSQLiteUserRepository_Create_TimestampHandling(t *testing.T) {
 		Email:      "test@example.com",
 	}
 	
-	// Timestamps should be zero initially
-	if !user.CreatedAt.IsZero() {
-		t.Errorf("CreatedAt should be zero initially")
-	}
-	if !user.UpdatedAt.IsZero() {
-		t.Errorf("UpdatedAt should be zero initially")
-	}
-	
-	// This will fail due to nil DB, but we can check that timestamps would be set
-	// by examining the error handling logic
 	err := repo.Create(user)
-	if err == nil {
-		t.Errorf("Create() should fail with nil database connection")
-	}
-}
-
-// TestSQLiteUserRepository_Update_TimestampHandling tests timestamp handling in update
-func TestSQLiteUserRepository_Update_TimestampHandling(t *testing.T) {
-	db := &DB{DB: nil}
-	repo := &SQLiteUserRepository{db: db}
-	
-	originalTime := time.Now().Add(-time.Hour)
-	user := &models.User{
-		ID:         1,
-		Provider:   "github",
-		ProviderID: "12345",
-		Username:   "testuser",
-		Email:      "test@example.com",
-		CreatedAt:  originalTime,
-		UpdatedAt:  originalTime,
+	if err != nil {
+		t.Fatalf("Create() failed: %v", err)
 	}
 	
-	// This will fail due to nil DB, but we can verify the validation logic
-	err := repo.Update(user)
-	if err == nil {
-		t.Errorf("Update() should fail with nil database connection")
+	// Verify timestamps were set
+	if user.CreatedAt.IsZero() {
+		t.Errorf("CreatedAt should be set after Create()")
+	}
+	if user.UpdatedAt.IsZero() {
+		t.Errorf("UpdatedAt should be set after Create()")
+	}
+	
+	// Update user
+	user.Username = "updateduser"
+	user.Email = "updated@example.com"
+	originalUpdatedAt := user.UpdatedAt
+	
+	// Wait a bit to ensure timestamp difference
+	time.Sleep(10 * time.Millisecond)
+	
+	err = repo.Update(user)
+	if err != nil {
+		t.Fatalf("Update() failed: %v", err)
+	}
+	
+	// Verify UpdatedAt was changed
+	if !user.UpdatedAt.After(originalUpdatedAt) {
+		t.Errorf("UpdatedAt should be updated after Update()")
+	}
+	
+	// Find and verify updated user
+	foundUser, err := repo.FindByProviderID("github", "12345")
+	if err != nil {
+		t.Fatalf("FindByProviderID() failed: %v", err)
+	}
+	
+	if foundUser.Username != "updateduser" {
+		t.Errorf("Username = %v, want %v", foundUser.Username, "updateduser")
+	}
+	if foundUser.Email != "updated@example.com" {
+		t.Errorf("Email = %v, want %v", foundUser.Email, "updated@example.com")
 	}
 }

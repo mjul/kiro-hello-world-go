@@ -31,6 +31,15 @@ func (m *MockUserRepository) FindByProviderID(provider, providerID string) (*mod
 	return user, nil
 }
 
+func (m *MockUserRepository) FindByID(id int) (*models.User, error) {
+	for _, user := range m.users {
+		if user.ID == id {
+			return user, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *MockUserRepository) Create(user *models.User) error {
 	if err := user.Validate(); err != nil {
 		return err

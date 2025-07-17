@@ -51,44 +51,29 @@ func (tm *TemplateManager) LoadTemplates() error {
 func (tm *TemplateManager) RenderTemplate(c *gin.Context, templateName string, data interface{}) {
 	tmpl, exists := tm.templates[templateName]
 	if !exists {
-		// Create a template error and handle it through the error system
-		err := NewTemplateError("TEMPLATE_NOT_FOUND", 
-			fmt.Sprintf("Template %s not found", templateName), nil)
+		// For template not found errors, don't call HandleError to avoid infinite loops
+		// Instead, return a simple error response
+		c.Status(http.StatusInternalServerError)
+		c.Header("Content-Type", "text/html; charset=utf-8")
 		
-		// Try to get server from context to handle error properly
-		if serverInterface, exists := c.Get("server"); exists {
-			if server, ok := serverInterface.(*Server); ok {
-				server.HandleError(c, err)
-				return
-			}
-		}
-		
-		// Fallback to JSON response if server not available
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": fmt.Sprintf("Template %s not found", templateName),
-		})
+		html := fmt.Sprintf(`<!DOCTYPE html>
+<html><head><title>Template Error</title></head>
+<body><h1>Template Error</h1><p>Template %s not found</p></body></html>`, templateName)
+		c.Writer.WriteString(html)
 		return
 	}
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	
 	if err := tmpl.Execute(c.Writer, data); err != nil {
-		// Create a template error and handle it through the error system
-		templateErr := NewTemplateError("TEMPLATE_RENDER_FAILED", 
-			fmt.Sprintf("Failed to render template %s", templateName), err)
+		// For template render errors, also avoid HandleError to prevent loops
+		c.Status(http.StatusInternalServerError)
+		c.Header("Content-Type", "text/html; charset=utf-8")
 		
-		// Try to get server from context to handle error properly
-		if serverInterface, exists := c.Get("server"); exists {
-			if server, ok := serverInterface.(*Server); ok {
-				server.HandleError(c, templateErr)
-				return
-			}
-		}
-		
-		// Fallback to JSON response if server not available
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": fmt.Sprintf("Failed to render template: %v", err),
-		})
+		html := fmt.Sprintf(`<!DOCTYPE html>
+<html><head><title>Template Error</title></head>
+<body><h1>Template Render Error</h1><p>Failed to render template %s: %v</p></body></html>`, templateName, err)
+		c.Writer.WriteString(html)
 		return
 	}
 }
@@ -111,4 +96,10 @@ type DashboardPageData struct {
 // SetTemplate sets a template for testing purposes
 func (tm *TemplateManager) SetTemplate(name string, tmpl *template.Template) {
 	tm.templates[name] = tmpl
+}
+
+// HasTemplate checks if a template exists
+func (tm *TemplateManager) HasTemplate(templateName string) bool {
+	_, exists := tm.templates[templateName]
+	return exists
 }

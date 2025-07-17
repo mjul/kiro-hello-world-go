@@ -19,6 +19,10 @@ A secure Single Sign-On (SSO) web application built with Go and Gin framework, s
 
 - Go 1.24.5 or later
 - Git
+- GCC compiler (required for CGO and SQLite integration)
+  - **Windows**: Install [TDM-GCC](https://jmeubank.github.io/tdm-gcc/) or [MinGW-w64](https://www.mingw-w64.org/)
+  - **macOS**: Install Xcode Command Line Tools (`xcode-select --install`)
+  - **Linux**: Install build-essential (`sudo apt-get install build-essential` on Ubuntu/Debian)
 
 ### 1. Clone the Repository
 
@@ -74,6 +78,7 @@ Run the initialization script to set up your environment:
 
 **Development mode:**
 ```bash
+# CGO is enabled by default for go run
 go run .
 ```
 
@@ -85,8 +90,8 @@ LOG_LEVEL=debug go run .
 
 **Production build:**
 ```bash
-# Build the binary
-go build -o sso-web-app .
+# Build the binary with CGO enabled (required for SQLite)
+CGO_ENABLED=1 go build -o sso-web-app .
 
 # Run the binary
 ./sso-web-app
@@ -201,11 +206,13 @@ LOG_LEVEL=error go run .
 ### Building for Production
 
 ```bash
-# Build optimized release binary
-go build -ldflags="-s -w" -o sso-web-app .
+# Build optimized release binary with CGO enabled (required for SQLite)
+CGO_ENABLED=1 go build -ldflags="-s -w" -o sso-web-app .
 
 # The binary will be at ./sso-web-app
 ```
+
+**Note**: CGO is required for SQLite integration. Ensure GCC is installed in your build environment.
 
 ### Production Configuration
 
@@ -221,10 +228,16 @@ Create a `Dockerfile`:
 
 ```dockerfile
 FROM golang:1.24-alpine as builder
+
+# Install GCC and other build dependencies required for CGO
+RUN apk add --no-cache gcc musl-dev sqlite-dev
+
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+
+# Build with CGO enabled (required for SQLite)
 RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o sso-web-app .
 
 FROM alpine:latest
@@ -304,6 +317,12 @@ server {
 - Ensure `SESSION_SECRET` is set and consistent across restarts
 - Check that cookies are enabled in the browser
 
+**CGO/Build errors**
+- Ensure GCC is installed and available in PATH
+- On Windows, verify TDM-GCC or MinGW-w64 is properly installed
+- For Docker builds, ensure build dependencies are installed in the container
+- If getting "CGO_ENABLED=0" errors, explicitly set `CGO_ENABLED=1`
+
 ### Debug Mode
 
 Run with debug logging to troubleshoot issues:
@@ -331,11 +350,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Technology Stack
 
 - **Backend**: Go with Gin web framework
-- **Database**: SQLite with database/sql and go-sqlite3 driver
+- **Database**: SQLite with database/sql and go-sqlite3 driver (CGO-enabled for full SQLite features)
 - **Templates**: Go html/template package
 - **Authentication**: OAuth2 with Microsoft Graph API and GitHub API
 - **Session Management**: Custom session store with SQLite backend
 - **Testing**: Built-in Go testing with testify assertions
+
+### SQLite Integration Benefits
+
+This application uses the full SQLite driver (`github.com/mattn/go-sqlite3`) with CGO enabled, providing:
+
+- **Full SQLite Feature Set**: Access to all SQLite functions and extensions
+- **Better Performance**: Native C implementation for optimal speed
+- **Foreign Key Support**: Proper relational database constraints
+- **Advanced SQL Features**: Window functions, CTEs, and full-text search
+- **Reliability**: Production-ready SQLite with all safety features enabled
 
 ### Project Structure
 

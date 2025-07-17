@@ -214,8 +214,14 @@ func (s *Server) handleAPIError(c *gin.Context, appErr *AppError) {
 
 // handleWebError handles errors for web requests (HTML response)
 func (s *Server) handleWebError(c *gin.Context, appErr *AppError) {
-	// For authentication and session errors, redirect to login with error message
+	// For authentication and session errors, redirect to login
 	if appErr.Type == ErrorTypeAuthentication || appErr.Type == ErrorTypeSession {
+		// For logout and dashboard requests, redirect without error message
+		if c.Request.URL.Path == "/logout" || c.Request.URL.Path == "/dashboard" {
+			c.Redirect(http.StatusFound, "/login")
+			return
+		}
+		// For other requests, include error message
 		redirectURL := fmt.Sprintf("/login?error=%s", appErr.UserMessage)
 		c.Redirect(http.StatusFound, redirectURL)
 		return
@@ -228,7 +234,27 @@ func (s *Server) handleWebError(c *gin.Context, appErr *AppError) {
 		return
 	}
 	
-	// For other errors, show error page
+	// For validation errors (like invalid provider), redirect to login with error
+	if appErr.Type == ErrorTypeValidation {
+		redirectURL := fmt.Sprintf("/login?error=%s", appErr.UserMessage)
+		c.Redirect(http.StatusFound, redirectURL)
+		return
+	}
+	
+	// For database errors related to user not found, redirect to login
+	if appErr.Type == ErrorTypeDatabase && appErr.Code == "DB_USER_NOT_FOUND" {
+		redirectURL := fmt.Sprintf("/login?error=%s", appErr.UserMessage)
+		c.Redirect(http.StatusFound, redirectURL)
+		return
+	}
+	
+	// For template errors, use fallback HTML to avoid infinite loop
+	if appErr.Type == ErrorTypeTemplate {
+		s.renderFallbackError(c, appErr)
+		return
+	}
+	
+	// For other errors, try to show error page template
 	data := ErrorPageData{
 		Title:       "Error - SSO Web App",
 		ErrorCode:   appErr.Code,
@@ -239,7 +265,14 @@ func (s *Server) handleWebError(c *gin.Context, appErr *AppError) {
 	}
 	
 	c.Status(appErr.StatusCode)
-	s.templateManager.RenderTemplate(c, "error.html", data)
+	
+	// Check if error template exists before trying to render it
+	if s.templateManager.HasTemplate("error.html") {
+		s.templateManager.RenderTemplate(c, "error.html", data)
+	} else {
+		// Fallback to simple HTML if error template is missing
+		s.renderFallbackError(c, appErr)
+	}
 }
 
 // getBackURL determines the appropriate back URL for error pages
@@ -256,6 +289,42 @@ func (s *Server) getBackURL(c *gin.Context) string {
 	}
 	
 	return "/login"
+}
+
+// renderFallbackError renders a simple HTML error page without using templates
+// This prevents infinite loops when template errors occur
+func (s *Server) renderFallbackError(c *gin.Context, appErr *AppError) {
+	c.Status(appErr.StatusCode)
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	
+	// Simple HTML error page
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - SSO Web App</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
+        .error-container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .error-title { color: #d32f2f; font-size: 24px; margin-bottom: 20px; }
+        .error-message { color: #333; font-size: 16px; margin-bottom: 20px; }
+        .error-code { color: #666; font-size: 14px; margin-bottom: 20px; font-family: monospace; }
+        .back-link { display: inline-block; padding: 10px 20px; background-color: #1976d2; color: white; text-decoration: none; border-radius: 4px; }
+        .back-link:hover { background-color: #1565c0; }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1 class="error-title">Error</h1>
+        <p class="error-message">%s</p>
+        <p class="error-code">Error Code: %s</p>
+        <a href="%s" class="back-link">Go Back</a>
+    </div>
+</body>
+</html>`, appErr.UserMessage, appErr.Code, s.getBackURL(c))
+	
+	c.Writer.WriteString(html)
 }
 
 // ErrorHandlerMiddleware is a middleware that catches panics and converts them to errors
