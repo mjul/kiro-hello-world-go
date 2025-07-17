@@ -12,10 +12,17 @@ import (
 	"sso-web-app/services"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	log.Println("=== SSO Web App Starting ===")
+	
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: Could not load .env file: %v", err)
+	}
 	
 	// Load and validate configuration
 	log.Println("Loading configuration...")
