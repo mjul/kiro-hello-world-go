@@ -2,6 +2,9 @@
 
 A secure Single Sign-On (SSO) web application built with Go and Gin framework, supporting authentication via Microsoft 365 and GitHub OAuth2 providers.
 
+## Kiro Review
+This was generated with AWS Kiro. Compared to the [Rust version](https://github.com/mjul/kiro-hello-world-rust) it seems like it stumbled a bit more through this Go version with more trial and error. Simple things that would have been caught by a linter or a compiler with more elaborate error messages seemed to require searching and reasoning to fix. The template rendering also failed for almost every template, initially. Also the code seemed a bit quick and dirty with more hardcoded string repeated where the configuration should have been used.
+
 ## Features
 
 - 🔐 **Secure OAuth2 Authentication** with Microsoft 365 and GitHub
