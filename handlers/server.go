@@ -481,11 +481,12 @@ func (s *Server) dashboardHandler(c *gin.Context) {
 
 	// Prepare template data with actual user information
 	data := DashboardPageData{
-		Title:    "Dashboard - SSO Web App",
-		Username: user.Username,
-		Email:    user.Email,
-		Avatar:   user.AvatarURL,
-		Provider: user.Provider,
+		Title:     "Dashboard - SSO Web App",
+		Username:  user.Username,
+		Email:     user.Email,
+		Avatar:    user.AvatarURL,
+		Provider:  user.Provider,
+		CreatedAt: user.CreatedAt,
 	}
 
 	log.Printf("Dashboard accessed by user %s (ID: %d)", user.Username, user.ID)

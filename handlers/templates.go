@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -93,11 +94,12 @@ type LoginPageData struct {
 
 // DashboardPageData represents data for the dashboard page template
 type DashboardPageData struct {
-	Title    string
-	Username string
-	Email    string
-	Avatar   string
-	Provider string
+	Title     string
+	Username  string
+	Email     string
+	Avatar    string
+	Provider  string
+	CreatedAt time.Time
 }
 
 // SetTemplate sets a template for testing purposes
