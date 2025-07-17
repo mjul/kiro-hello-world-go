@@ -1,0 +1,148 @@
+{{define "error.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .error-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .error-icon {
+            font-size: 4rem;
+            color: #e74c3c;
+            margin-bottom: 1rem;
+        }
+        
+        .error-code {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .error-message {
+            font-size: 1.1rem;
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        
+        .error-details {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-align: left;
+            word-break: break-word;
+        }
+        
+        .error-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 480px) {
+            .error-container {
+                padding: 1.5rem;
+            }
+            
+            .error-icon {
+                font-size: 3rem;
+            }
+            
+            .error-actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        
+        {{if .ErrorCode}}
+        <div class="error-code">Error Code: {{.ErrorCode}}</div>
+        {{end}}
+        
+        <div class="error-message">{{.Message}}</div>
+        
+        {{if and .ShowDetails .Details}}
+        <div class="error-details">
+            <strong>Technical Details:</strong><br>
+            {{.Details}}
+        </div>
+        {{end}}
+        
+        <div class="error-actions">
+            {{if .BackURL}}
+            <a href="{{.BackURL}}" class="btn btn-secondary">Go Back</a>
+            {{end}}
+            <a href="/login" class="btn btn-primary">Go to Login</a>
+        </div>
+    </div>
+</body>
+</html>
+{{end}}
