@@ -1,23 +1,23 @@
 # SSO Web App
 
-A secure Single Sign-On (SSO) web application built with Go and (TBD), supporting authentication via Microsoft 365 and GitHub OAuth2 providers.
+A secure Single Sign-On (SSO) web application built with Go and Gin framework, supporting authentication via Microsoft 365 and GitHub OAuth2 providers.
 
 ## Features
 
 - 🔐 **Secure OAuth2 Authentication** with Microsoft 365 and GitHub
-- 🎨 **Modern Web Interface** with responsive design and Askama templates
+- 🎨 **Modern Web Interface** with responsive design and HTML templates
 - 🛡️ **Session Management** with secure HTTP-only cookies
 - 🗄️ **SQLite Database** with automatic migrations
 - 🔒 **CSRF Protection** for OAuth2 flows
 - 📱 **Mobile-Friendly** responsive design
-- ⚡ **Fast & Lightweight** built with Rust and (TBD)
+- ⚡ **Fast & Lightweight** built with Go and Gin framework
 - 🧪 **Comprehensive Testing** with unit and integration tests
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go ....
+- Go 1.24.5 or later
 - Git
 
 ### 1. Clone the Repository
@@ -73,21 +73,23 @@ Run the initialization script to set up your environment:
 ### 4. Run the Application
 
 **Development mode:**
-TODO:
 ```bash
+go run .
 ```
 
 **With debug logging:**
-TODO:
-```powershell
-# Windows PowerShell
-
-# Linux/macOS
+```bash
+# Set log level for more verbose output
+LOG_LEVEL=debug go run .
 ```
 
 **Production build:**
-TODO:
 ```bash
+# Build the binary
+go build -o sso-web-app .
+
+# Run the binary
+./sso-web-app
 ```
 
 The application will be available at `http://localhost:3000`
@@ -153,14 +155,21 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ```bash
 # Run all tests
-cargo test
+go test ./...
 
-# Run specific test suites
-cargo test --lib          # Unit tests
-cargo test --test integration_tests  # Integration tests
+# Run tests with verbose output
+go test -v ./...
 
-# Run with output
-cargo test -- --nocapture
+# Run specific package tests
+go test ./handlers
+go test ./models
+go test ./services
+
+# Run integration tests
+go test -tags=integration ./...
+
+# Run tests with coverage
+go test -cover ./...
 ```
 
 ### Database Management
@@ -169,22 +178,22 @@ The application automatically creates and migrates the SQLite database on startu
 
 ```bash
 rm sso_app.db
-cargo run  # Will recreate and migrate
+go run .  # Will recreate and migrate
 ```
 
 ### Logging
 
-Set the `RUST_LOG` environment variable to control logging levels:
+The application uses Go's built-in log package. You can control logging by setting environment variables or modifying the log level in the code:
 
 ```bash
-# Debug level (default in development)
-RUST_LOG=debug cargo run
+# Run with debug logging
+LOG_LEVEL=debug go run .
 
-# Info level for production
-RUST_LOG=info cargo run
+# Run with info level logging
+LOG_LEVEL=info go run .
 
-# Specific module logging
-RUST_LOG=sso_web_app=debug,tower_http=info cargo run
+# Run with minimal logging
+LOG_LEVEL=error go run .
 ```
 
 ## Production Deployment
@@ -193,9 +202,9 @@ RUST_LOG=sso_web_app=debug,tower_http=info cargo run
 
 ```bash
 # Build optimized release binary
-cargo build --release
+go build -ldflags="-s -w" -o sso-web-app .
 
-# The binary will be at ./target/release/sso-web-app
+# The binary will be at ./sso-web-app
 ```
 
 ### Production Configuration
@@ -203,7 +212,7 @@ cargo build --release
 1. **Use HTTPS**: Update `BASE_URL` to use `https://`
 2. **Secure Session Secret**: Use a strong, randomly generated secret
 3. **Database**: Consider using a persistent volume for SQLite file
-4. **Logging**: Set `RUST_LOG=info` or `RUST_LOG=warn`
+4. **Logging**: Set `LOG_LEVEL=info` or `LOG_LEVEL=warn`
 5. **OAuth2 Redirects**: Update OAuth2 app configurations with production URLs
 
 ### Docker Deployment
@@ -211,17 +220,18 @@ cargo build --release
 Create a `Dockerfile`:
 
 ```dockerfile
-FROM rust:1.70 as builder
+FROM golang:1.24-alpine as builder
 WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
-RUN cargo build --release
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o sso-web-app .
 
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY --from=builder /app/target/release/sso-web-app .
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates sqlite
+WORKDIR /root/
+COPY --from=builder /app/sso-web-app .
 COPY --from=builder /app/templates ./templates
-COPY --from=builder /app/migrations ./migrations
 EXPOSE 3000
 CMD ["./sso-web-app"]
 ```
@@ -269,8 +279,8 @@ server {
 
 - **OAuth2 CSRF Protection**: State parameter validation
 - **Secure Session Cookies**: HttpOnly, SameSite=Lax
-- **SQL Injection Prevention**: Parameterized queries with SQLx
-- **XSS Prevention**: Template escaping with Askama
+- **SQL Injection Prevention**: Parameterized queries with database/sql
+- **XSS Prevention**: Template escaping with html/template
 - **Session Management**: Secure session storage and cleanup
 - **Error Handling**: No sensitive information leakage
 
@@ -299,7 +309,7 @@ server {
 Run with debug logging to troubleshoot issues:
 
 ```bash
-RUST_LOG=debug cargo run
+LOG_LEVEL=debug go run .
 ```
 
 ## Contributing
@@ -307,7 +317,7 @@ RUST_LOG=debug cargo run
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
 3. Make your changes and add tests
-4. Run tests: `cargo test`
+4. Run tests: `go test ./...`
 5. Commit your changes: `git commit -am 'Add feature'`
 6. Push to the branch: `git push origin feature-name`
 7. Submit a pull request
@@ -320,37 +330,48 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Technology Stack
 
-- **Backend**: Rust with Axum web framework
-- **Database**: SQLite with SQLx for async operations
-- **Templates**: Askama (compile-time Jinja2-like templates)
+- **Backend**: Go with Gin web framework
+- **Database**: SQLite with database/sql and go-sqlite3 driver
+- **Templates**: Go html/template package
 - **Authentication**: OAuth2 with Microsoft Graph API and GitHub API
-- **Session Management**: Tower-sessions with memory store
-- **Testing**: Built-in Rust testing with axum-test
+- **Session Management**: Custom session store with SQLite backend
+- **Testing**: Built-in Go testing with testify assertions
 
 ### Project Structure
 
 ```
 sso-web-app/
-├── src/
-│   ├── main.rs              # Application entry point
-│   ├── lib.rs               # Library exports
-│   ├── auth.rs              # OAuth2 authentication logic
-│   ├── config.rs            # Configuration management
-│   ├── database.rs          # Database models and repository
-│   ├── error.rs             # Error handling and types
-│   ├── handlers.rs          # HTTP route handlers
-│   ├── models.rs            # Data models
-│   ├── session.rs           # Session management
-│   └── templates.rs         # Template structures
-├── templates/               # Askama HTML templates
-│   ├── base.html           # Base template layout
-│   ├── login.html          # Login page
-│   └── dashboard.html      # User dashboard
-├── migrations/             # Database migrations
-│   └── 001_create_users_table.sql
-├── tests/                  # Integration tests
-│   └── integration_tests.rs
-├── Cargo.toml             # Rust dependencies
-├── .env.example           # Environment variables template
-└── README.md              # This file
+├── config/                  # Configuration management
+│   ├── config.go           # Configuration loading and validation
+│   └── config_test.go      # Configuration tests
+├── database/               # Database layer
+│   ├── database.go         # Database initialization
+│   ├── session_store.go    # Session storage implementation
+│   ├── user_repository.go  # User data access layer
+│   └── *_test.go          # Database tests
+├── handlers/               # HTTP handlers and middleware
+│   ├── server.go           # Main server setup and routing
+│   ├── errors.go           # Error handling middleware
+│   ├── logging.go          # Logging middleware
+│   ├── templates.go        # Template rendering
+│   └── *_test.go          # Handler tests
+├── models/                 # Data models
+│   ├── user.go            # User model
+│   ├── session.go         # Session model
+│   └── *_test.go          # Model tests
+├── services/               # Business logic layer
+│   ├── auth_service.go     # Authentication service
+│   ├── oauth_config.go     # OAuth2 configuration
+│   └── *_test.go          # Service tests
+├── templates/              # HTML templates
+│   ├── base.html          # Base template layout
+│   ├── login.html         # Login page
+│   ├── dashboard.html     # User dashboard
+│   └── error.html         # Error page
+├── main.go                # Application entry point
+├── go.mod                 # Go module dependencies
+├── go.sum                 # Go module checksums
+├── .env.example          # Environment variables template
+├── integration_test.go   # Integration tests
+└── README.md             # This file
 ```
