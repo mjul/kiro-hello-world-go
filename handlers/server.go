@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sso-web-app/config"
 	"sso-web-app/database"
 	"sso-web-app/models"
@@ -113,7 +114,7 @@ func (s *Server) corsMiddleware() gin.HandlerFunc {
 		origin := c.Request.Header.Get("Origin")
 		
 		// Allow requests from the same origin or localhost for development
-		if origin == s.config.BaseURL || origin == "http://localhost:8080" {
+		if origin == s.config.BaseURL || strings.HasPrefix(origin, "http://localhost") {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}
 		
@@ -145,7 +146,7 @@ func (s *Server) securityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Frame-Options", "DENY")
 		
 		// Enforce HTTPS in production
-		if s.config.BaseURL != "http://localhost:8080" {
+		if !strings.HasPrefix(s.config.BaseURL, "http://localhost") {
 			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 		
@@ -166,18 +167,24 @@ func (s *Server) sessionMiddleware() gin.HandlerFunc {
 		sessionID, err := c.Cookie("session_id")
 		if err != nil {
 			// No session cookie found, continue without session
+			log.Printf("No session cookie found: %v", err)
 			c.Next()
 			return
 		}
+
+		log.Printf("Found session cookie: %s", sessionID)
 
 		// Validate session
 		session, err := s.authService.ValidateSession(sessionID)
 		if err != nil {
 			// Invalid or expired session, clear the cookie
+			log.Printf("Session validation failed: %v", err)
 			s.clearSessionCookie(c)
 			c.Next()
 			return
 		}
+
+		log.Printf("Session validated successfully for user ID: %d", session.UserID)
 
 		// Store session in context for use by handlers
 		c.Set("session", session)
@@ -189,24 +196,29 @@ func (s *Server) sessionMiddleware() gin.HandlerFunc {
 
 // setSessionCookie sets a secure session cookie
 func (s *Server) setSessionCookie(c *gin.Context, sessionID string, maxAge int) {
-	secure := s.config.BaseURL != "http://localhost:8080" // HTTPS only in production
+	secure := !strings.HasPrefix(s.config.BaseURL, "http://localhost") // HTTPS only in production
 	
-	c.SetCookie(
-		"session_id",           // name
-		sessionID,              // value
-		maxAge,                 // maxAge (seconds)
-		"/",                    // path
-		"",                     // domain (empty for same domain)
-		secure,                 // secure (HTTPS only)
-		true,                   // httpOnly (prevent XSS)
-	)
+	log.Printf("Setting cookie - BaseURL: %s, Secure: %t", s.config.BaseURL, secure)
 	
-	// Set SameSite attribute manually for additional CSRF protection
-	if secure {
-		c.Header("Set-Cookie", c.Writer.Header().Get("Set-Cookie")+"; SameSite=Strict")
-	} else {
-		c.Header("Set-Cookie", c.Writer.Header().Get("Set-Cookie")+"; SameSite=Lax")
+	// Use http.Cookie for proper cookie formatting
+	cookie := &http.Cookie{
+		Name:     "session_id",
+		Value:    sessionID,
+		MaxAge:   maxAge,
+		Path:     "/",
+		Domain:   "",
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	}
+	
+	if secure {
+		cookie.SameSite = http.SameSiteStrictMode
+	}
+	
+	http.SetCookie(c.Writer, cookie)
+	
+	log.Printf("Cookie set with secure=%t, SameSite=%s", secure, map[bool]string{true: "Strict", false: "Lax"}[secure])
 }
 
 // clearSessionCookie clears the session cookie
@@ -422,7 +434,9 @@ func (s *Server) oauthCallbackHandler(c *gin.Context) {
 	}
 
 	// Set session cookie
-	s.setSessionCookie(c, session.ID, int(session.TimeUntilExpiry().Seconds()))
+	sessionDuration := int(session.TimeUntilExpiry().Seconds())
+	log.Printf("Setting session cookie: ID=%s, Duration=%d seconds", session.ID, sessionDuration)
+	s.setSessionCookie(c, session.ID, sessionDuration)
 
 	// Log successful authentication
 	logger := NewLogger(LogLevelInfo)
